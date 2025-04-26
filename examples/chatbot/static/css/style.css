@@ -1,0 +1,289 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    height: 100vh;
+    background-color: #f0f0f0;
+}
+
+#app {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.pane {
+    height: 100vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 15px;
+    display: flex;
+    flex-direction: column; /* Base layout for panes */
+}
+
+.left-pane {
+    width: 25%;
+    background-color: #e9e9e9;
+    border-right: 1px solid #ccc;
+}
+
+.center-pane {
+    width: 50%;
+    background-color: #fff;
+    display: flex; /* Override flex-direction for chat box */
+    flex-direction: column;
+}
+
+.right-pane {
+    width: 25%;
+    background-color: #f8f8f8;
+    border-left: 1px solid #ccc;
+    position: relative; /* Needed for sticky button positioning */
+}
+
+/* Session List */
+.session-list-container h2 {
+    margin-top: 0;
+    font-size: 1.2em;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 10px;
+}
+.add-session-btn {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.add-session-btn:hover {
+    background-color: #0056b3;
+}
+.session-list-container ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1; /* Allow list to take remaining space */
+    overflow-y: auto; /* Scroll within the list */
+}
+.session-item {
+    padding: 10px 8px;
+    border-bottom: 1px solid #ddd;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.session-item:hover {
+    background-color: #dcdcdc;
+}
+.session-item.selected {
+    background-color: #c0dfff;
+    font-weight: bold;
+}
+.session-name {
+    flex-grow: 1;
+    margin-right: 5px;
+     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.delete-btn {
+    background: #ff4d4d;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+    padding: 2px 5px;
+    line-height: 1;
+    flex-shrink: 0; /* Prevent shrinking */
+}
+.delete-btn:hover {
+    background: #cc0000;
+}
+
+
+/* Chat Box */
+.chat-box-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Fill the center pane */
+}
+.messages-container {
+    flex-grow: 1; /* Takes up available space */
+    overflow-y: auto; /* Enables scrolling */
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 10px;
+}
+.message {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 15px;
+    max-width: 70%;
+    word-wrap: break-word;
+}
+.message .role-indicator {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.9em;
+    color: #555;
+}
+.message.user {
+    background-color: #d1eaff;
+    margin-left: auto; /* Align user messages to the right */
+    border-bottom-right-radius: 5px;
+}
+.message.assistant {
+    background-color: #f1f1f1;
+    margin-right: auto; /* Align assistant messages to the left */
+    border-bottom-left-radius: 5px;
+}
+.message.system {
+    font-style: italic;
+    color: #666;
+    text-align: center;
+    background: none;
+}
+.message .content {
+    display: inline-block; /* Allows proper wrapping */
+}
+.message pre.content { /* Use pre for better formatting of potential code/whitespace */
+    white-space: pre-wrap; /* Wrap long lines but preserve whitespace */
+    word-wrap: break-word; /* Ensure wrapping */
+    margin: 0;
+    font-family: inherit; /* Use same font as rest of chat */
+    font-size: 1em;
+}
+.typing-indicator {
+    display: inline-block;
+    margin-left: 5px;
+    font-style: italic;
+    color: #888;
+}
+.input-area {
+    display: flex;
+    padding: 10px;
+    border-top: 1px solid #eee;
+}
+.input-area input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-right: 10px;
+}
+.input-area button {
+    padding: 10px 15px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.input-area button:disabled {
+    background-color: #aaa;
+    cursor: not-allowed;
+}
+.input-area button:hover:not(:disabled) {
+    background-color: #218838;
+}
+.system-message {
+    text-align: center;
+    color: #888;
+    margin-top: 20px;
+    font-style: italic;
+}
+
+/* Notification Widget */
+.notification-widget-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.toggle-button.sticky-toggle {
+    /* position: sticky; */ /* Can make it sticky within the right pane */
+    /* top: 10px; */
+    /* z-index: 10; */
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+}
+.toggle-button.sticky-toggle:hover {
+    background-color: #5a6268;
+}
+.notification-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 4px;
+}
+.notification-controls {
+    text-align: right;
+    margin-bottom: 5px;
+}
+.clear-all-btn {
+    padding: 3px 8px;
+    font-size: 0.8em;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.clear-all-btn:hover {
+     background-color: #c82333;
+}
+.no-notifications {
+    color: #888;
+    text-align: center;
+    padding: 20px 0;
+}
+.notification-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.notification-item {
+    background-color: #e2f0ff;
+    border: 1px solid #b8d4ff;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+}
+.notification-item span {
+    margin-right: 10px;
+    flex-grow: 1;
+}
+.notification-item .close-btn {
+    background: #aaa;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.8em;
+    width: 18px;
+    height: 18px;
+    line-height: 16px; /* Adjust for vertical centering */
+    text-align: center;
+    padding: 0;
+    flex-shrink: 0;
+}
+.notification-item .close-btn:hover {
+    background: #888;
+}

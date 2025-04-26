@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body>
+    <div id="app" class="app-container">
+        <div id="session-list-app" class="pane left-pane">
+             <session-list @select-session="handleSessionSelected"></session-list>
+        </div>
+
+        <div id="chat-app" class="pane center-pane">
+            <chat-box :session-id="selectedSessionId"></chat-box>
+        </div>
+
+        <div id="notification-app" class="pane right-pane">
+             <notification-widget></notification-widget>
+        </div>
+    </div>
+
+    <script src="/static/js/components/SessionList.vue.js"></script>
+    <script src="/static/js/components/ChatBox.vue.js"></script>
+    <script src="/static/js/components/NotificationWidget.vue.js"></script>
+
+    <script type="module"> // Use type="module" for imports
+        import SessionList from '/static/js/components/SessionList.vue.js';
+        import ChatBox from '/static/js/components/ChatBox.vue.js';
+        import NotificationWidget from '/static/js/components/NotificationWidget.vue.js';
+
+        const { createApp, ref } = Vue;
+
+        const app = createApp({
+            setup() {
+                const selectedSessionId = ref(null); // Holds the ID of the currently selected session
+
+                const handleSessionSelected = (sessionId) => {
+                    console.log("App: Session selected:", sessionId);
+                    selectedSessionId.value = sessionId;
+                };
+
+                return {
+                    selectedSessionId,
+                    handleSessionSelected
+                };
+            }
+        });
+
+        // Register components globally or locally if preferred
+        app.component('session-list', SessionList);
+        app.component('chat-box', ChatBox);
+        app.component('notification-widget', NotificationWidget);
+
+        app.mount('#app'); // Mount the main Vue app to the container
+    </script>
+
+</body>
+</html>
