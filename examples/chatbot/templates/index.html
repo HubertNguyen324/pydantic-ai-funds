@@ -9,52 +9,93 @@
 </head>
 <body>
     <div id="app" class="app-container">
-        <div id="session-list-app" class="pane left-pane">
-             <session-list @select-session="handleSessionSelected"></session-list>
+        <div class="pane left-pane"> <session-list
+                :available-agents="availableAgents"
+                v-model:selected-agent-id="selectedAgentId"
+                v-model:temperature="temperature"
+                v-model:top-k="topK"
+                v-model:top-p="topP"
+                @select-session="handleSessionSelected"
+             ></session-list>
         </div>
 
-        <div id="chat-app" class="pane center-pane">
-            <chat-box :session-id="selectedSessionId"></chat-box>
+        <div class="pane center-pane"> <chat-box
+                :session-id="selectedSessionId"
+                :agent-id="selectedAgentId"
+                :temperature="temperature"
+                :top-k="topK"
+                :top-p="topP"
+            ></chat-box>
         </div>
 
-        <div id="notification-app" class="pane right-pane">
-             <notification-widget></notification-widget>
+        <div class="pane right-pane"> <notification-widget></notification-widget>
         </div>
     </div>
 
-    <script src="/static/js/components/SessionList.vue.js"></script>
-    <script src="/static/js/components/ChatBox.vue.js"></script>
-    <script src="/static/js/components/NotificationWidget.vue.js"></script>
-
-    <script type="module"> // Use type="module" for imports
+    <script type="module">
         import SessionList from '/static/js/components/SessionList.vue.js';
         import ChatBox from '/static/js/components/ChatBox.vue.js';
         import NotificationWidget from '/static/js/components/NotificationWidget.vue.js';
 
-        const { createApp, ref } = Vue;
+        const { createApp, ref, onMounted } = Vue; // Add onMounted
 
         const app = createApp({
             setup() {
-                const selectedSessionId = ref(null); // Holds the ID of the currently selected session
+                // --- Centralized State ---
+                const selectedSessionId = ref(null);
+                const availableAgents = ref([]); // To store agents from backend
+                const selectedAgentId = ref(null); // ID of the selected agent
+                const temperature = ref(0.7);   // Default temperature
+                const topK = ref(40);          // Default Top-K (or null if backend default preferred)
+                const topP = ref(0.9);          // Default Top-P (or null)
 
+                // --- Methods ---
                 const handleSessionSelected = (sessionId) => {
                     console.log("App: Session selected:", sessionId);
                     selectedSessionId.value = sessionId;
                 };
 
+                // Fetch available agents from backend
+                const fetchAgents = async () => {
+                    try {
+                        const response = await fetch('/api/agents');
+                        if (!response.ok) throw new Error('Failed to fetch agents');
+                        const agents = await response.json();
+                        availableAgents.value = agents;
+                        // Set default selected agent if not already set and agents exist
+                        if (!selectedAgentId.value && agents.length > 0) {
+                            selectedAgentId.value = agents[0].id;
+                        }
+                        console.log("App: Fetched agents:", agents);
+                    } catch (error) {
+                        console.error("App: Error fetching agents:", error);
+                        availableAgents.value = [{ id: 'error', name: 'Error loading agents' }];
+                         selectedAgentId.value = 'error';
+                    }
+                };
+
+                // Fetch agents when the app mounts
+                onMounted(fetchAgents);
+
+                // --- Return state and methods ---
                 return {
                     selectedSessionId,
+                    availableAgents,
+                    selectedAgentId,
+                    temperature,
+                    topK,
+                    topP,
                     handleSessionSelected
                 };
             }
         });
 
-        // Register components globally or locally if preferred
+        // Register components (keep as before)
         app.component('session-list', SessionList);
         app.component('chat-box', ChatBox);
         app.component('notification-widget', NotificationWidget);
 
-        app.mount('#app'); // Mount the main Vue app to the container
+        app.mount('#app');
     </script>
 
 </body>
