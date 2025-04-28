@@ -6,11 +6,11 @@
     <title>AI Chatbot v2</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    </head>
+</head>
 <body>
     <div id="app" class="app-container">
         <div class="pane left-pane">
-            <topic-list-panel
+             <topic-list-panel
                 :topics="topics"
                 :available-agents="availableAgents"
                 :current-settings="currentSettings"
@@ -18,28 +18,31 @@
                 @select-topic="handleSelectTopic"
                 @delete-topic="handleDeleteTopic"
                 @update-settings="handleUpdateSettings"
-            ></topic-list-panel>
+             ></topic-list-panel>
+        </div>
+
+        <div class="pane center-pane">
+            <chat-box
+                :key="selectedTopicId" :topic-id="selectedTopicId"
+                :topic-name="selectedTopicName"
+                :messages="currentChatMessages"
+                :is-loading-history="isLoadingHistory"
+                :is-streaming="isStreaming"
+                @send-message="handleSendMessage"
+            ></chat-box>
         </div>
 
         <div class="pane right-pane">
-             <chat-box
-                 :topic-id="selectedTopicId"
-                 :topic-name="selectedTopicName"
-                 :messages="currentChatMessages"
-                 :is-loading-history="isLoadingHistory"
-                 :is-streaming="isStreaming"
-                 @send-message="handleSendMessage"
-             ></chat-box>
+            <notification-widget
+                :notifications="notifications"
+                @close-notification="handleCloseNotification"
+                @clear-notifications="handleClearNotifications"
+            ></notification-widget>
         </div>
-
-        <notification-widget
-            :notifications="notifications"
-            @close-notification="handleCloseNotification"
-            @clear-notifications="handleClearNotifications"
-        ></notification-widget>
     </div>
 
     <script type="module">
+        // Rename SessionList -> TopicListPanel, update others
         import TopicListPanel from '/static/js/components/TopicListPanel.vue.js';
         import ChatBox from '/static/js/components/ChatBox.vue.js';
         import NotificationWidget from '/static/js/components/NotificationWidget.vue.js';
@@ -48,86 +51,113 @@
 
         const app = createApp({
             setup() {
-                // --- WebSocket State --- (no change)
+                // --- WebSocket State ---
                 const ws = ref(null);
                 const isConnected = ref(false);
                 const wsError = ref(null);
 
-                // --- Core App State --- (no change)
-                const topics = ref([]);
+                // --- Core App State ---
+                const topics = ref([]); // List of {id, name, agent_id, created_at}
                 const availableAgents = ref([]);
                 const selectedTopicId = ref(null);
-                const currentChatMessages = ref([]);
+                const currentChatMessages = ref([]); // Messages for the selected topic
                 const isLoadingHistory = ref(false);
-                const isStreaming = ref(false);
-                const notifications = ref([]);
-                const currentSettings = reactive({ /* ... */ });
+                const isStreaming = ref(false); // Is AI currently streaming a response?
+                const notifications = ref([]); // {id, message}
 
-                // --- Computed Properties --- (no change)
-                const selectedTopic = computed(() => { /* ... */ });
+                // Settings are now a single reactive object
+                const currentSettings = reactive({
+                    temperature: 0.7,
+                    topK: 40,
+                    topP: 0.9
+                });
+
+                // --- Computed Properties ---
+                const selectedTopic = computed(() => {
+                    return topics.value.find(t => t.id === selectedTopicId.value);
+                });
                 const selectedTopicName = computed(() => selectedTopic.value?.name || "No Topic Selected");
 
-                // --- WebSocket Logic --- (no change)
-                const connectWebSocket = () => { /* ... */ };
-                const sendMessageToWS = (messageObject) => { /* ... */ };
+                // --- WebSocket Logic ---
+                const connectWebSocket = () => {
+                    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+                    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+                    console.log("Connecting WebSocket:", wsUrl);
+                    wsError.value = null;
 
-                // --- Helper: Focus Chat Input ---
-                const focusChatInput = () => {
-                    // Use nextTick to ensure the input exists and is visible after state changes
-                    nextTick(() => {
-                        const inputElement = document.querySelector('.input-area input[type="text"]');
-                        if (inputElement) {
-                            inputElement.focus();
-                            console.log("Focused chat input.");
-                        } else {
-                            console.warn("Could not find chat input element to focus.");
-                        }
-                    });
+                    ws.value = new WebSocket(wsUrl);
+
+                    ws.value.onopen = () => {
+                        console.log("WebSocket Connected");
+                        isConnected.value = true;
+                        // Request initial topic list on connect
+                        sendMessageToWS({ type: "list_topics" });
+                    };
+
+                    ws.value.onmessage = (event) => {
+                        handleWebSocketMessage(JSON.parse(event.data));
+                    };
+
+                    ws.value.onerror = (error) => {
+                        console.error("WebSocket Error:", error);
+                        wsError.value = "Connection failed or was interrupted.";
+                        isConnected.value = false;
+                    };
+
+                    ws.value.onclose = (event) => {
+                        console.log("WebSocket Closed:", event.reason);
+                        isConnected.value = false;
+                        ws.value = null;
+                        // Optional: Reconnection logic
+                        // setTimeout(connectWebSocket, 5000);
+                    };
                 };
 
-                // --- WebSocket Message Handler (MODIFIED) ---
+                const sendMessageToWS = (messageObject) => {
+                    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+                         console.log("Sending WS message:", messageObject);
+                        ws.value.send(JSON.stringify(messageObject));
+                    } else {
+                        console.error("WebSocket not open. Cannot send message:", messageObject);
+                        wsError.value = "Connection lost. Please refresh.";
+                    }
+                };
+
+                // --- WebSocket Message Handler ---
                 const handleWebSocketMessage = (message) => {
                      console.log("Received WS message:", message);
                     const { type, payload } = message;
 
                     switch (type) {
                         case "topic_list":
-                            const newTopicsList = payload.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                            topics.value = newTopicsList;
-                            // Auto-selection logic is moved to topic_created or handled after create request
+                            topics.value = payload.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // Sort newest first
+                            topics.value = sortedTopics;
+                            if (!selectedTopicId.value && sortedTopics.length > 0) {
+                                console.log("Auto-selecting newest topic on initial load.");
+                                handleSelectTopic(sortedTopics[0].id);
+                            }
                             break;
-
                         case "topic_created":
-                             // Assuming payload contains the new topic object {id, name, ...}
-                             console.log("Topic created successfully:", payload);
-                             // OPTION 1: Add directly (if topic_list isn't sent immediately after)
-                             // topics.value.unshift(payload);
-                             // topics.value.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // Re-sort if needed
-
-                             // OPTION 2: Rely on topic_list being sent right after.
-
-                             // --- Auto-select the newly created topic and focus ---
-                             // Ensure DOM updates before selecting and focusing
-                             nextTick(() => {
-                                handleSelectTopic(payload.id); // Select the new topic
-                                // Focus handled within handleSelectTopic now or called here:
-                                // focusChatInput(); // Ensure focus after selection
+                            // Can optionally just add the new topic instead of waiting for full list
+                            // topics.value.unshift(payload);
+                            nextTick(() => {
+                                console.log(`Auto-selecting newly created topic: ${payload.id}`);
+                                handleSelectTopic(payload.id); // Select the new topic by its ID
                              });
-                             break;
-
-                        // Other cases remain largely the same...
+                            break;
                         case "topic_deleted":
+                            // Handled by receiving updated topic_list generally
                             if (selectedTopicId.value === payload.topic_id) {
-                                selectedTopicId.value = null;
+                                selectedTopicId.value = null; // Deselect if deleted
                                 currentChatMessages.value = [];
                             }
-                            // Rely on subsequent topic_list update to refresh UI
                             break;
                         case "history":
                             if (payload.topic_id === selectedTopicId.value) {
                                 currentChatMessages.value = payload.messages;
                                 isLoadingHistory.value = false;
-                                nextTick(scrollToBottomInChatBox); // Scroll after loading history
+                                // Scroll to bottom after history loads
+                                nextTick(() => { /* Need way to trigger ChatBox scroll */ });
                             }
                             break;
                         case "message_chunk":
@@ -137,25 +167,31 @@
                                 if (lastMessage && lastMessage.role === 'assistant') {
                                     lastMessage.content += payload.chunk;
                                 } else {
-                                    currentChatMessages.value.push({ role: 'assistant', content: payload.chunk, timestamp: new Date().toISOString() });
+                                    // Start a new assistant message if needed
+                                    currentChatMessages.value.push({
+                                        role: 'assistant',
+                                        content: payload.chunk,
+                                        timestamp: new Date().toISOString()
+                                    });
                                 }
-                                nextTick(scrollToBottomInChatBox); // Scroll as chunks arrive
+                                // Scroll as chunks arrive
+                                 nextTick(() => { /* Need way to trigger ChatBox scroll */ });
                             }
                             break;
                          case "message_end":
                              if (payload.topic_id === selectedTopicId.value) {
                                 isStreaming.value = false;
-                                // Final scroll after streaming ends
-                                nextTick(scrollToBottomInChatBox);
+                                // Potentially finalize message object if needed
                              }
                             break;
                         case "notification":
-                            notifications.value.unshift(payload);
+                            notifications.value.unshift(payload); // Add to top
                             break;
                         case "error":
                             console.error("Backend Error:", payload.message);
-                            alert(`Error: ${payload.message}`);
-                            isLoadingHistory.value = false;
+                            // Display error to user appropriately (e.g., toast notification)
+                            alert(`Error: ${payload.message}`); // Simple alert for now
+                            isLoadingHistory.value = false; // Stop loading indicators on error
                             isStreaming.value = false;
                             break;
                         default:
@@ -163,74 +199,125 @@
                     }
                 };
 
-                 // Helper to trigger ChatBox scroll (if needed, depends on ChatBox implementation)
-                 // If ChatBox handles scrolling internally on props.messages change, this might not be needed.
-                 const scrollToBottomInChatBox = () => {
-                     // This is tricky without direct component communication like provide/inject or event bus.
-                     // Let's assume ChatBox's internal watch/onUpdated handles scrolling for now.
-                     // If not, would need a more complex solution.
-                     console.log("Attempting scroll (ChatBox should handle internally)");
-                 };
-
-
-                // --- Event Handlers from Components (MODIFIED) ---
+                // --- Event Handlers from Components ---
                 const handleSelectTopic = (topicId) => {
-                    if (selectedTopicId.value === topicId && currentChatMessages.value.length > 0) return; // Don't re-select/fetch if already selected and has messages
+                    if (selectedTopicId.value === topicId) return; // No change
 
                     console.log("App: Selecting topic:", topicId);
                     selectedTopicId.value = topicId;
-                    currentChatMessages.value = [];
-                    isStreaming.value = false;
+                    currentChatMessages.value = []; // Clear old messages
+                    isStreaming.value = false; // Reset streaming state
 
                     if (topicId) {
                         isLoadingHistory.value = true;
                         sendMessageToWS({ type: "get_history", payload: { topic_id: topicId } });
-                         // Try focusing input after selecting a topic
-                        focusChatInput();
                     }
                 };
 
-                const handleCreateTopic = (topicData) => { // Receives { agent_id, name }
-                    // No modal data, just the default agent/name from TopicListPanel
+                const handleCreateTopic = (topicData) => { // { agent_id, name }
                     sendMessageToWS({ type: "create_topic", payload: topicData });
-                    // Auto-selection now happens when 'topic_created' message is received
+                     // Optional: Select the new topic once confirmed via topic_created/topic_list?
                 };
 
-                const handleDeleteTopic = (topicId) => { // No change
+                const handleDeleteTopic = (topicId) => {
                     sendMessageToWS({ type: "delete_topic", payload: { topic_id: topicId } });
                 };
 
-                const handleUpdateSettings = (newSettings) => { // No change
+                const handleUpdateSettings = (newSettings) => {
+                    // Use Object.assign to update the reactive object
                     Object.assign(currentSettings, newSettings);
                     console.log("App: Settings updated", currentSettings);
                 };
 
-                const handleSendMessage = (messageText) => { // No change
+                const handleSendMessage = (messageText) => {
                     if (!selectedTopicId.value || !messageText) return;
-                    currentChatMessages.value.push({ role: 'user', content: messageText, timestamp: new Date().toISOString() });
-                     nextTick(scrollToBottomInChatBox);
-                    sendMessageToWS({ /* ... payload ... */ });
+
+                    // Optimistic UI update for user message
+                    currentChatMessages.value.push({
+                        role: 'user',
+                        content: messageText,
+                        timestamp: new Date().toISOString()
+                    });
+                     nextTick(() => { /* Need way to trigger ChatBox scroll */ });
+
+
+                    sendMessageToWS({
+                        type: "chat_message",
+                        payload: {
+                            topic_id: selectedTopicId.value,
+                            message: messageText,
+                            settings: { // Send current settings
+                                temperature: currentSettings.temperature,
+                                top_k: currentSettings.topK,
+                                top_p: currentSettings.topP,
+                            }
+                        }
+                    });
                 };
 
-                const handleCloseNotification = (id) => { /* ... no change ... */ };
-                const handleClearNotifications = () => { /* ... no change ... */ };
+                const handleCloseNotification = (id) => {
+                     notifications.value = notifications.value.filter(n => n.id !== id);
+                };
 
-                // --- Initial Data Fetching --- (no change)
-                const fetchInitialData = async () => { /* ... */ };
+                const handleClearNotifications = () => {
+                     notifications.value = [];
+                };
 
-                // --- Lifecycle Hooks --- (no change)
-                onMounted(() => { /* ... */ });
-                onUnmounted(() => { /* ... */ });
+                // --- Initial Data Fetching ---
+                const fetchInitialData = async () => {
+                     try {
+                        const response = await fetch('/api/agents');
+                        if (!response.ok) throw new Error('Failed to fetch agents');
+                        availableAgents.value = await response.json();
+                     } catch (error) {
+                         console.error("App: Error fetching agents:", error);
+                         availableAgents.value = [{ id: 'error', name: 'Error loading' }];
+                     }
+                };
 
-                // --- Return State and Methods --- (no change in structure)
-                return { /* ... */ };
+                // --- Lifecycle Hooks ---
+                onMounted(() => {
+                    fetchInitialData();
+                    connectWebSocket();
+                });
+
+                onUnmounted(() => {
+                    if (ws.value) {
+                        ws.value.close();
+                    }
+                });
+
+                // --- Return State and Methods ---
+                return {
+                    // State
+                    topics,
+                    availableAgents,
+                    selectedTopicId,
+                    selectedTopicName, // Use computed prop
+                    currentChatMessages,
+                    isLoadingHistory,
+                    isStreaming,
+                    notifications,
+                    currentSettings, // Pass reactive object
+                    isConnected,
+                    wsError,
+
+                    // Methods / Handlers
+                    handleCreateTopic,
+                    handleSelectTopic,
+                    handleDeleteTopic,
+                    handleUpdateSettings,
+                    handleSendMessage,
+                    handleCloseNotification,
+                    handleClearNotifications,
+                };
             }
         });
 
-        // Register components (no change)
-        app.component('topic-list-panel', TopicListPanel);
+        // Register components
+        app.component('topic-list-panel', TopicListPanel); // Renamed
         app.component('chat-box', ChatBox);
-        app.component('notification-widget', NotificationWidget);
+        app.component('notification-widget', NotificationWidget); // Pass notifications down
 
         app.mount('#app');
     </script>

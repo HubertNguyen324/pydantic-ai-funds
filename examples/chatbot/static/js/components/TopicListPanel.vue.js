@@ -1,42 +1,45 @@
 // static/js/components/TopicListPanel.vue.js
-const { ref, reactive, computed } = Vue; // No change in imports
+const { ref, reactive, computed } = Vue;
 
 const TopicListPanel = {
   props: {
     topics: { type: Array, default: () => [] },
     availableAgents: { type: Array, default: () => [] },
-    currentSettings: { type: Object, required: true },
+    currentSettings: { type: Object, required: true }, // Receive reactive settings object
   },
   emits: ["create-topic", "select-topic", "delete-topic", "update-settings"],
   setup(props, { emit }) {
     const localSelectedTopicId = ref(null); // For styling list items only
-    // Removed: showNewTopicModal, newTopicData refs
-
-    // Computed properties for settings remain the same
-    const settingsProxy = computed({
-      /* ... keep as is ... */
+    const newTopicData = reactive({
+      name: "",
+      agent_id: null,
     });
+
+    // Use computed properties to interact with the reactive currentSettings prop
+    // This allows local binding while emitting updates correctly
+    const settingsProxy = computed({
+      get: () => props.currentSettings,
+      set: (newVal) => {
+        // This setter might not be directly used if emitting individual updates,
+        // but useful if modifying the whole object.
+        emit("update-settings", newVal);
+      },
+    });
+    // Or emit individual updates if preferred
     const updateSetting = (key, value) => {
-      /* ... keep as is ... */
+      // Ensure numbers are parsed correctly
       let parsedValue = value;
       if (key === "temperature" || key === "topP") {
         parsedValue = Number(value);
       } else if (key === "topK") {
-        // Allow empty string or 0 to represent null/off
-        parsedValue =
-          value === "" || Number(value) === 0 ? null : Number(value);
-      } else if (key === "topP") {
-        parsedValue =
-          value === "" || Number(value) === 0 ? null : Number(value);
+        parsedValue = value === "" ? null : Number(value); // Handle potential empty input for TopK
       }
-      // Ensure null is sent if value results in 0 for K/P
-      if (key === "topK" && parsedValue === 0) parsedValue = null;
-      if (key === "topP" && parsedValue === 0) parsedValue = null;
+      if (key === "topK" && parsedValue === 0) parsedValue = null; // Treat 0 as null/off
+      if (key === "topP" && parsedValue === 0) parsedValue = null; // Treat 0 as null/off
 
       emit("update-settings", { ...props.currentSettings, [key]: parsedValue });
     };
 
-    // --- Topic Action Methods ---
     const selectTopic = (topicId) => {
       localSelectedTopicId.value = topicId;
       emit("select-topic", topicId);
@@ -49,7 +52,7 @@ const TopicListPanel = {
       }
     };
 
-    // MODIFIED: Directly trigger topic creation
+    // Directly trigger topic creation
     const triggerCreateTopic = () => {
       if (props.availableAgents.length > 0) {
         // Use the first available agent as default
@@ -67,29 +70,23 @@ const TopicListPanel = {
       }
     };
 
-    // Removed: openNewTopicModal, submitNewTopic methods
-
-    // Format date helper remains the same
+    // Format date helper
     const formatDate = (isoString) => {
-      /* ... keep as is ... */
       if (!isoString) return "";
       const date = new Date(isoString);
-      return date.toLocaleString();
+      return date.toLocaleString(); // Adjust format as needed
     };
 
     return {
       localSelectedTopicId,
       selectTopic,
       triggerDeleteTopic,
-      triggerCreateTopic, // Expose new method
+      triggerCreateTopic,
       formatDate,
       settingsProxy,
       updateSetting,
-      // Removed: showNewTopicModal, newTopicData
     };
   },
-  // --- Template ---
-  // Remove the modal div entirely
   template: `
         <div class="topic-list-container">
             <div class="topics-area">

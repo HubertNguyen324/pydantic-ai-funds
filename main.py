@@ -1,3 +1,9 @@
+from fastapi import FastAPI
+from fastapi import WebSocket
+
+app = FastAPI()
+
+
 def main():
     print("Hello from pydantic-ai-funds!")
 
