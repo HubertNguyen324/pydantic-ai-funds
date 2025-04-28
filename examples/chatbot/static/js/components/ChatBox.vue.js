@@ -1,26 +1,30 @@
 // static/js/components/ChatBox.vue.js
-const { ref, watch, nextTick } = Vue; // Keep imports
+
+// Assuming Vue is loaded globally via a script tag in your HTML
+const { ref, watch, nextTick, onUpdated } = Vue;
 
 const ChatBox = {
-  // --- Props ---
-  // Receive session ID AND agent settings from parent
+  // Define the properties this component expects from its parent
   props: {
-    sessionId: String,
-    agentId: String,
-    temperature: Number,
-    topK: Number, // Can be null
-    topP: Number, // Can be null
+    topicId: String, // The ID of the currently selected topic
+    topicName: String, // The name of the currently selected topic
+    messages: { type: Array, default: () => [] }, // Array of message objects
+    isLoadingHistory: Boolean, // Indicates if message history is being loaded
+    isStreaming: Boolean, // Indicates if a message is currently streaming
   },
-  emits: [],
-  setup(props) {
-    const messages = ref([]);
+  // Define the custom events this component can emit
+  emits: ["send-message"],
+
+  // The setup function is where you define reactive state, computed properties, and methods
+  setup(props, { emit }) {
+    // Reactive reference for the current input text in the message box
     const currentInput = ref("");
-    const isLoading = ref(false);
+    // Reactive reference to the messages container DOM element for scrolling
     const chatContainer = ref(null);
 
-    // --- Methods ---
+    // Function to scroll the chat container to the bottom
     const scrollToBottom = () => {
-      /* ... keep existing ... */
+      // Use nextTick to ensure DOM updates are complete before scrolling
       nextTick(() => {
         if (chatContainer.value) {
           chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
@@ -28,131 +32,115 @@ const ChatBox = {
       });
     };
 
-    const fetchMessages = async (sessionId) => {
-      /* ... keep existing ... */
-      if (!sessionId) {
-        messages.value = [];
-        return;
-      }
-      isLoading.value = true;
-      try {
-        const response = await fetch(`/api/sessions/${sessionId}`);
-        if (!response.ok) throw new Error("Failed to fetch messages");
-        messages.value = await response.json();
-        scrollToBottom();
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-        messages.value = [
-          { role: "system", content: "Error loading chat history." },
-        ];
-      } finally {
-        isLoading.value = false;
-      }
-    };
-
-    // MODIFIED: Include agent settings in the fetch body
-    const sendMessage = async () => {
-      if (!currentInput.value.trim() || !props.sessionId || isLoading.value)
-        return;
-
-      const userMessage = { role: "user", content: currentInput.value };
-      messages.value.push(userMessage);
-      const messageToSend = currentInput.value;
-      currentInput.value = "";
-      scrollToBottom();
-      isLoading.value = true;
-
-      const assistantMessage = { role: "assistant", content: "" };
-      messages.value.push(assistantMessage);
-      const assistantMessageIndex = messages.value.length - 1;
-
-      try {
-        // --- Prepare payload with settings ---
-        const payload = {
-          message: messageToSend,
-          agent_id: props.agentId,
-          temperature: props.temperature,
-          top_k: props.topK,
-          top_p: props.topP,
-        };
-        console.log("Sending chat message with payload:", payload); // Log for debugging
-
-        const response = await fetch(`/api/chat/${props.sessionId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload), // Send the full payload
+    // Handler for sending a message
+    const handleSendMessage = () => {
+      const messageText = currentInput.value.trim();
+      // Prevent sending if message is empty, no topic is selected, or AI is streaming
+      if (!messageText || !props.topicId || props.isStreaming) {
+        console.warn("Send message prevented:", {
+          messageTextEmpty: !messageText,
+          noTopic: !props.topicId,
+          isStreaming: props.isStreaming,
         });
+        return;
+      }
+      // Emit the 'send-message' event to the parent component with the message text
+      emit("send-message", messageText);
+      // Clear the input field after sending
+      currentInput.value = "";
+      // Scroll to the bottom after the user sends a message (optimistic scroll)
+      // The parent will add the message to the array, which will trigger the watcher/onUpdated scroll.
+      // This initial scroll provides immediate feedback.
+      scrollToBottom();
+    };
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        // Handle streaming response (keep existing logic)
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let streamedContent = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          streamedContent += chunk;
-          messages.value[assistantMessageIndex].content = streamedContent;
-          scrollToBottom();
-        }
-        console.log("Streaming complete.");
-      } catch (error) {
-        console.error("Error sending message or streaming response:", error);
-        messages.value[
-          assistantMessageIndex
-        ].content = `Error: ${error.message}`;
-      } finally {
-        isLoading.value = false;
-        scrollToBottom();
+    // Helper function to format ISO date strings into a readable format
+    const formatDate = (isoString) => {
+      if (!isoString) return "";
+      try {
+        const date = new Date(isoString);
+        // Use toLocaleString for a user-friendly date/time format
+        return date.toLocaleString();
+      } catch (e) {
+        console.error("Invalid date string:", isoString, e);
+        return "Invalid Date";
       }
     };
 
-    // Watcher remains the same
+    // Watcher: Scroll to bottom whenever the messages array or streaming state changes
+    // This ensures the chat stays scrolled to the bottom as new messages or chunks arrive.
     watch(
-      () => props.sessionId,
-      (newSessionId, oldSessionId) => {
-        console.log(`ChatBox: Session changed to ${newSessionId}`);
-        fetchMessages(newSessionId);
+      () => [props.messages, props.isStreaming],
+      () => {
+        console.log("Messages or streaming state changed, scrolling...");
+        scrollToBottom();
       },
-      { immediate: true }
+      {
+        deep: true, // Deep watch is needed because we modify properties of objects within the messages array during streaming
+        // immediate: true // Uncomment if you want to scroll immediately on initial load
+      }
     );
 
+    // Lifecycle Hook: Scroll to bottom after the component's DOM is updated
+    // This provides an additional guarantee that scrolling happens after the DOM
+    // reflects the latest state, useful for ensuring scroll after history load or initial render.
+    onUpdated(() => {
+      // console.log("ChatBox updated, scrolling...");
+      scrollToBottom();
+    });
+
+    // Return the reactive state, computed properties, and methods to be used in the template
     return {
-      messages,
-      currentInput,
-      isLoading,
-      sendMessage,
-      chatContainer,
+      currentInput, // The text in the input field
+      chatContainer, // Reference to the messages container DOM element
+      handleSendMessage, // Method to send a message
+      formatDate, // Helper function for date formatting
+      // Props are directly accessible in the template, no need to return them unless aliasing
+      // topicId, topicName, messages, isLoadingHistory, isStreaming
     };
   },
-  // Template remains the same
+
+  // --- Template ---
+  // The HTML structure for the ChatBox component
   template: `
-        <div class="chat-box-wrapper">
-            <div class="messages-container" ref="chatContainer">
-                <div v-if="!sessionId" class="system-message">Select or create a session to start chatting.</div>
-                <div v-else-if="isLoading && messages.length === 0" class="system-message">Loading chat...</div>
-                <div v-for="(msg, index) in messages" :key="index" :class="['message', msg.role]">
-                    <span class="role-indicator">{{ msg.role === 'user' ? 'You' : 'AI' }}:</span>
-                    <pre class="content">{{ msg.content }}</pre>
-                     <span v-if="isLoading && msg.role === 'assistant' && index === messages.length - 1 && !msg.content" class="typing-indicator">...</span>
-                </div>
-            </div>
-            <div class="input-area">
-                <input
-                    type="text"
-                    v-model="currentInput"
-                    @keyup.enter="sendMessage"
-                    placeholder="Type your message..."
-                    :disabled="!sessionId || isLoading"
-                />
-                <button @click="sendMessage" :disabled="!sessionId || isLoading || !currentInput.trim()">Send</button>
-            </div>
+    <div class="chat-box-wrapper">
+      <div class="chat-header">
+        <h3>{{ topicName || 'Select a Topic' }}</h3>
+        <span v-if="topicId">ID: {{ topicId.substring(0,8) }}</span>
+      </div>
+
+      <div class="messages-container" ref="chatContainer">
+        <div v-if="!topicId" class="system-message">Select or create a topic to start chatting.</div>
+        <div v-else-if="isLoadingHistory" class="system-message">Loading history...</div>
+        <div v-else-if="messages.length === 0 && !isLoadingHistory" class="system-message">
+            No messages yet in this topic. Send one!
         </div>
-    `,
+
+        <div v-for="(msg, index) in messages" :key="msg.timestamp + '-' + index" :class="['message', msg.role]">
+          <div class="message-header">
+            <span class="role-indicator">{{ msg.role === 'user' ? 'You' : 'AI' }}</span>
+            <span class="timestamp">{{ formatDate(msg.timestamp) }}</span>
+          </div>
+          <pre class="content">{{ msg.content }}</pre>
+          <span v-if="isStreaming && msg.role === 'assistant' && index === messages.length - 1" class="typing-indicator">...</span>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <input
+          type="text"
+          v-model="currentInput"
+          @keyup.enter="handleSendMessage"
+          :placeholder="!topicId ? 'Select a topic first...' : (isStreaming ? 'AI is responding...' : 'Type your message...')"
+          :disabled="!topicId || isStreaming"
+        />
+        <button @click="handleSendMessage" :disabled="!topicId || isStreaming || !currentInput.trim()">
+          Send
+        </button>
+      </div>
+    </div>
+  `,
 };
 
+// Export the component definition
 export default ChatBox;

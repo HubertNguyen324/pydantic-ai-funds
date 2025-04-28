@@ -1,3 +1,6 @@
+/* static/css/style.css */
+
+/* --- General Layout --- */
 body {
     font-family: sans-serif;
     margin: 0;
@@ -5,6 +8,7 @@ body {
     display: flex;
     height: 100vh;
     background-color: #f0f0f0;
+    overflow: hidden; /* Prevent body scroll */
 }
 
 #app {
@@ -15,41 +19,66 @@ body {
 
 .pane {
     height: 100vh;
-    overflow-y: auto;
     box-sizing: border-box;
-    padding: 15px;
-    display: flex;
-    flex-direction: column; /* Base layout for panes */
+    display: flex; /* Use flex for pane content */
+    flex-direction: column; /* Default direction */
 }
 
 .left-pane {
-    width: 25%;
+    width: 25%; /* Adjust as needed */
+    min-width: 280px; /* Ensure it doesn't get too small */
     background-color: #e9e9e9;
     border-right: 1px solid #ccc;
+    /* Make the pane a flex column to position settings at bottom */
+    display: flex;
+    flex-direction: column;
+    padding: 0; /* Remove padding from pane itself */
+    height: 100%;
 }
 
 .center-pane {
-    width: 50%;
+    width: 50%; /* Adjust as needed */
     background-color: #fff;
-    display: flex; /* Override flex-direction for chat box */
+    display: flex;
     flex-direction: column;
+    height: 100%;
+    padding: 0; /* No padding on pane, add to inner components */
 }
 
 .right-pane {
-    width: 25%;
+    width: 25%; /* Adjust as needed */
+    min-width: 250px;
     background-color: #f8f8f8;
     border-left: 1px solid #ccc;
     position: relative; /* Needed for sticky button positioning */
+    height: 100%;
+    padding: 15px; /* Add padding back to right pane */
 }
 
-/* Session List */
-.session-list-container h2 {
+/* --- Left Pane: Topic List & Settings --- */
+.topic-list-container { /* Replaces .session-list-container */
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Fill the left pane */
+    overflow: hidden; /* Prevent container overflow */
+}
+
+.topics-area { /* Replaces .sessions-area */
+    padding: 15px;
+    flex-grow: 1; /* Allow topic list to take available space */
+    overflow-y: auto; /* Scroll only the topics list */
+    border-bottom: 2px solid #ccc; /* Separator line */
+}
+
+.topic-list-container h2 {
     margin-top: 0;
     font-size: 1.2em;
     border-bottom: 1px solid #ccc;
     padding-bottom: 10px;
+    color: #333;
 }
-.add-session-btn {
+
+.add-topic-btn { /* Replaces .add-session-btn */
     width: 100%;
     padding: 10px;
     margin-bottom: 15px;
@@ -58,39 +87,56 @@ body {
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    font-size: 1em;
 }
-.add-session-btn:hover {
-    background-color: #0056b3;
-}
-.session-list-container ul {
+.add-topic-btn:hover { background-color: #0056b3; }
+
+.topic-list-container ul {
     list-style: none;
     padding: 0;
     margin: 0;
-    flex-grow: 1; /* Allow list to take remaining space */
-    overflow-y: auto; /* Scroll within the list */
 }
-.session-item {
+
+.topic-item { /* Replaces .session-item */
     padding: 10px 8px;
     border-bottom: 1px solid #ddd;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: background-color 0.2s ease;
 }
-.session-item:hover {
-    background-color: #dcdcdc;
-}
-.session-item.selected {
-    background-color: #c0dfff;
-    font-weight: bold;
-}
-.session-name {
+.topic-item:hover { background-color: #dcdcdc; }
+.topic-item.selected { background-color: #c0dfff; }
+
+.topic-info {
+    display: flex;
+    flex-direction: column;
     flex-grow: 1;
-    margin-right: 5px;
-     white-space: nowrap;
+    margin-right: 8px;
+    overflow: hidden; /* Important for ellipsis */
+}
+.topic-name {
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 3px;
+    color: #111;
+}
+.topic-item.selected .topic-name {
+    color: #003d7a;
+}
+
+.topic-agent, .topic-date {
+    font-size: 0.8em;
+    color: #555;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.topic-agent { margin-bottom: 2px; }
+
 .delete-btn {
     background: #ff4d4d;
     color: white;
@@ -101,90 +147,218 @@ body {
     padding: 2px 5px;
     line-height: 1;
     flex-shrink: 0; /* Prevent shrinking */
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
 }
-.delete-btn:hover {
-    background: #cc0000;
+.delete-btn:hover { background: #cc0000; opacity: 1; }
+
+/* Left Pane: Settings Area */
+.agent-settings-area {
+    padding: 15px;
+    background-color: #dde2e7;
+    flex-shrink: 0; /* Prevent shrinking */
+    border-top: 1px solid #ccc;
 }
 
+.agent-settings-area h3 {
+    margin-top: 0;
+    margin-bottom: 5px; /* Reduced margin */
+    font-size: 1.1em;
+    border-bottom: 1px solid #bbb;
+    padding-bottom: 8px;
+    color: #333;
+}
+.settings-info {
+    font-size: 0.8em;
+    color: #666;
+    margin-top: 0px;
+    margin-bottom: 15px;
+    /* text-align: center; */ /* Optional */
+}
+.setting-item {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.setting-item label {
+    font-weight: bold;
+    margin-right: 10px;
+    flex-basis: 100px; /* Adjusted width */
+    flex-shrink: 0;
+    font-size: 0.9em;
+    color: #444;
+}
+.setting-item select,
+.setting-item input[type="range"] {
+    flex-grow: 1;
+    max-width: 250px; /* Limit width */
+    cursor: pointer;
+}
+.setting-item select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+.setting-item.slider-item span {
+    margin-left: 10px;
+    font-size: 0.9em;
+    min-width: 40px; /* Ensure space */
+    text-align: right;
+    font-family: monospace; /* Consistent width for numbers */
+    color: #111;
+}
 
-/* Chat Box */
+/* --- Center Pane: Chat Box --- */
 .chat-box-wrapper {
     display: flex;
     flex-direction: column;
     height: 100%; /* Fill the center pane */
+    width: 100%;
 }
+
+.chat-header {
+    padding: 10px 15px;
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #ddd;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.chat-header h3 {
+    margin: 0;
+    font-size: 1.1em;
+    color: #222;
+     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 10px;
+}
+.chat-header span {
+    font-size: 0.8em;
+    color: #666;
+    font-family: monospace;
+    flex-shrink: 0;
+}
+
 .messages-container {
     flex-grow: 1; /* Takes up available space */
     overflow-y: auto; /* Enables scrolling */
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    margin-bottom: 10px;
+    padding: 15px;
+    background-color: #ffffff; /* Ensure white background */
 }
+
 .message {
-    margin-bottom: 10px;
-    padding: 8px 12px;
-    border-radius: 15px;
-    max-width: 70%;
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    border-radius: 18px;
+    max-width: 75%; /* Slightly wider max */
     word-wrap: break-word;
+    position: relative; /* For potential future absolute elements */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
-.message .role-indicator {
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.role-indicator {
     font-weight: bold;
-    display: block;
-    margin-bottom: 4px;
     font-size: 0.9em;
-    color: #555;
+}
+.timestamp {
+    font-size: 0.75em;
+    color: #777;
+}
+.message pre.content { /* Use pre for better formatting */
+    white-space: pre-wrap; /* Wrap long lines but preserve whitespace */
+    word-wrap: break-word;
+    margin: 0;
+    font-family: inherit;
+    font-size: 1em;
+    line-height: 1.4;
 }
 .message.user {
-    background-color: #d1eaff;
+    background-color: #007bff;
+    color: white;
     margin-left: auto; /* Align user messages to the right */
     border-bottom-right-radius: 5px;
 }
+.message.user .role-indicator { color: #e0f0ff; }
+.message.user .timestamp { color: #cce4ff; }
+
 .message.assistant {
-    background-color: #f1f1f1;
+    background-color: #e9ecef;
+    color: #333;
     margin-right: auto; /* Align assistant messages to the left */
     border-bottom-left-radius: 5px;
 }
-.message.system {
+.message.assistant .role-indicator { color: #495057; }
+.message.assistant .timestamp { color: #6c757d; }
+
+.message.system { /* System/Error messages */
     font-style: italic;
     color: #666;
     text-align: center;
     background: none;
+    box-shadow: none;
+    max-width: 100%;
+    margin-top: 20px;
+    margin-bottom: 20px;
 }
-.message .content {
-    display: inline-block; /* Allows proper wrapping */
-}
-.message pre.content { /* Use pre for better formatting of potential code/whitespace */
-    white-space: pre-wrap; /* Wrap long lines but preserve whitespace */
-    word-wrap: break-word; /* Ensure wrapping */
-    margin: 0;
-    font-family: inherit; /* Use same font as rest of chat */
-    font-size: 1em;
+.system-message { /* Placeholder messages */
+    text-align: center;
+    color: #888;
+    padding: 30px 10px;
+    font-style: italic;
 }
 .typing-indicator {
     display: inline-block;
-    margin-left: 5px;
+    margin-left: 8px;
     font-style: italic;
-    color: #888;
+    color: #555; /* Make it slightly more visible */
+    animation: blink 1.5s infinite;
 }
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Input Area */
 .input-area {
     display: flex;
-    padding: 10px;
-    border-top: 1px solid #eee;
+    padding: 10px 15px; /* Match messages padding */
+    border-top: 1px solid #ddd;
+    background-color: #f8f9fa;
+    flex-shrink: 0; /* Prevent shrinking */
+    align-items: center; /* Vertically align items */
 }
-.input-area input {
+.input-area input[type="text"] {
     flex-grow: 1;
-    padding: 10px;
+    padding: 12px 15px; /* Slightly larger padding */
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 20px; /* Rounded input */
     margin-right: 10px;
+    font-size: 1em;
+    line-height: 1.3; /* Ensure text doesn't get cut off */
+}
+.input-area input[type="text"]:focus {
+    outline: none;
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 .input-area button {
-    padding: 10px 15px;
+    padding: 10px 18px;
     background-color: #28a745;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 20px; /* Rounded button */
     cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
 }
 .input-area button:disabled {
     background-color: #aaa;
@@ -193,23 +367,16 @@ body {
 .input-area button:hover:not(:disabled) {
     background-color: #218838;
 }
-.system-message {
-    text-align: center;
-    color: #888;
-    margin-top: 20px;
-    font-style: italic;
-}
 
-/* Notification Widget */
+
+/* --- Right Pane: Notification Widget --- */
 .notification-widget-container {
     display: flex;
     flex-direction: column;
     height: 100%;
 }
 .toggle-button.sticky-toggle {
-    /* position: sticky; */ /* Can make it sticky within the right pane */
-    /* top: 10px; */
-    /* z-index: 10; */
+    /* Removed sticky positioning for simplicity in this flex layout */
     padding: 8px 12px;
     margin-bottom: 10px;
     cursor: pointer;
@@ -217,21 +384,26 @@ body {
     color: white;
     border: none;
     border-radius: 4px;
+    width: 100%;
+    text-align: left;
+    font-size: 0.9em;
 }
-.toggle-button.sticky-toggle:hover {
-    background-color: #5a6268;
-}
+.toggle-button.sticky-toggle:hover { background-color: #5a6268; }
+
 .notification-list {
-    flex-grow: 1;
+    flex-grow: 1; /* Takes available space */
     overflow-y: auto;
-    border: 1px solid #eee;
+    border: 1px solid #ddd;
     background-color: #fff;
     padding: 10px;
     border-radius: 4px;
+    display: flex; /* Use flex for content */
+    flex-direction: column; /* Stack controls and list */
 }
 .notification-controls {
     text-align: right;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
+    flex-shrink: 0; /* Don't shrink controls */
 }
 .clear-all-btn {
     padding: 3px 8px;
@@ -242,18 +414,23 @@ body {
     border-radius: 3px;
     cursor: pointer;
 }
-.clear-all-btn:hover {
-     background-color: #c82333;
-}
+.clear-all-btn:hover { background-color: #c82333; }
+
 .no-notifications {
     color: #888;
     text-align: center;
     padding: 20px 0;
+    flex-grow: 1; /* Center vertically if no items */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .notification-list ul {
     list-style: none;
     padding: 0;
     margin: 0;
+    flex-grow: 1; /* Allow list to take space */
+    overflow-y: auto; /* Scroll within the list itself if needed */
 }
 .notification-item {
     background-color: #e2f0ff;
@@ -265,10 +442,13 @@ body {
     justify-content: space-between;
     align-items: center;
     font-size: 0.9em;
+    color: #333;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.05);
 }
 .notification-item span {
     margin-right: 10px;
     flex-grow: 1;
+    line-height: 1.3;
 }
 .notification-item .close-btn {
     background: #aaa;
@@ -279,116 +459,9 @@ body {
     font-size: 0.8em;
     width: 18px;
     height: 18px;
-    line-height: 16px; /* Adjust for vertical centering */
+    line-height: 18px; /* Center 'X' */
     text-align: center;
     padding: 0;
     flex-shrink: 0;
 }
-.notification-item .close-btn:hover {
-    background: #888;
-}
-
-.left-pane {
-    width: 25%; /* Or adjust as needed */
-    background-color: #e9e9e9;
-    border-right: 1px solid #ccc;
-    /* Make the pane a flex column to position settings at bottom */
-    display: flex;
-    flex-direction: column;
-    padding: 0; /* Remove padding from pane itself */
-}
-
-/* Adjust Session List Container */
-.session-list-container {
-    display: flex;
-    flex-direction: column;
-    height: 100%; /* Fill the left pane */
-}
-
-.sessions-area {
-    padding: 15px; /* Add padding back to this specific area */
-    flex-grow: 1; /* Allow session list to take available space */
-    overflow-y: auto; /* Scroll only the sessions list */
-    border-bottom: 2px solid #ccc; /* Separator line */
-}
-
-.session-list-container h2 {
-    margin-top: 0;
-    font-size: 1.2em;
-    border-bottom: 1px solid #ccc;
-    padding-bottom: 10px;
-}
-.add-session-btn { /* ... keep existing styles ... */ }
-.session-list-container ul { /* ... keep existing styles ... */ }
-.session-item { /* ... keep existing styles ... */ }
-/* ... other session list styles ... */
-
-
-/* NEW: Agent Settings Area Styles */
-.agent-settings-area {
-    padding: 15px;
-    background-color: #dde2e7; /* Slightly different background */
-    flex-shrink: 0; /* Prevent shrinking */
-     /* No fixed height, let content determine height */
-     border-top: 1px solid #ccc; /* Optional separator */
-}
-
-.agent-settings-area h3 {
-    margin-top: 0;
-    margin-bottom: 15px;
-    font-size: 1.1em;
-    border-bottom: 1px solid #bbb;
-    padding-bottom: 8px;
-}
-
-.setting-item {
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center; /* Align label and control vertically */
-    flex-wrap: wrap; /* Allow wrapping if needed */
-}
-
-.setting-item label {
-    font-weight: bold;
-    margin-right: 10px;
-    flex-basis: 80px; /* Give labels a consistent width */
-    flex-shrink: 0;
-    font-size: 0.9em;
-}
-
-.setting-item select,
-.setting-item input[type="range"] {
-    flex-grow: 1; /* Allow controls to take remaining space */
-    max-width: 250px; /* Limit width on wider screens */
-}
-.setting-item select {
-    padding: 5px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-}
-
-.setting-item.slider-item span {
-    margin-left: 10px;
-    font-size: 0.9em;
-    min-width: 40px; /* Ensure space for value display */
-    text-align: right;
-}
-
-
-/* Chat Box & Input Area Styles (for alignment reference) */
-.center-pane { /* Keep as is */ }
-.chat-box-wrapper { /* Keep as is */ }
-.messages-container { /* Keep as is */ }
-
-.input-area {
-    display: flex;
-    padding: 10px 15px; /* Match horizontal padding of settings */
-    border-top: 1px solid #eee;
-    background-color: #f8f8f8; /* Match settings bg if desired */
-    flex-shrink: 0; /* Prevent shrinking */
-}
-/* ... rest of input-area styles ... */
-
-/* Notification Widget Styles (keep as is) */
-.right-pane { /* Keep as is */ }
-/* ... rest of styles ... */
+.notification-item .close-btn:hover { background: #888; }

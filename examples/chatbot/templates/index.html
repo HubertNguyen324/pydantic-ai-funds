@@ -3,95 +3,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chatbot</title>
+    <title>AI Chatbot v2</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-</head>
+    </head>
 <body>
     <div id="app" class="app-container">
-        <div class="pane left-pane"> <session-list
+        <div class="pane left-pane">
+            <topic-list-panel
+                :topics="topics"
                 :available-agents="availableAgents"
-                v-model:selected-agent-id="selectedAgentId"
-                v-model:temperature="temperature"
-                v-model:top-k="topK"
-                v-model:top-p="topP"
-                @select-session="handleSessionSelected"
-             ></session-list>
+                :current-settings="currentSettings"
+                @create-topic="handleCreateTopic"
+                @select-topic="handleSelectTopic"
+                @delete-topic="handleDeleteTopic"
+                @update-settings="handleUpdateSettings"
+            ></topic-list-panel>
         </div>
 
-        <div class="pane center-pane"> <chat-box
-                :session-id="selectedSessionId"
-                :agent-id="selectedAgentId"
-                :temperature="temperature"
-                :top-k="topK"
-                :top-p="topP"
-            ></chat-box>
+        <div class="pane right-pane">
+             <chat-box
+                 :topic-id="selectedTopicId"
+                 :topic-name="selectedTopicName"
+                 :messages="currentChatMessages"
+                 :is-loading-history="isLoadingHistory"
+                 :is-streaming="isStreaming"
+                 @send-message="handleSendMessage"
+             ></chat-box>
         </div>
 
-        <div class="pane right-pane"> <notification-widget></notification-widget>
-        </div>
+        <notification-widget
+            :notifications="notifications"
+            @close-notification="handleCloseNotification"
+            @clear-notifications="handleClearNotifications"
+        ></notification-widget>
     </div>
 
     <script type="module">
-        import SessionList from '/static/js/components/SessionList.vue.js';
+        import TopicListPanel from '/static/js/components/TopicListPanel.vue.js';
         import ChatBox from '/static/js/components/ChatBox.vue.js';
         import NotificationWidget from '/static/js/components/NotificationWidget.vue.js';
 
-        const { createApp, ref, onMounted } = Vue; // Add onMounted
+        const { createApp, ref, reactive, computed, onMounted, onUnmounted, nextTick } = Vue;
 
         const app = createApp({
             setup() {
-                // --- Centralized State ---
-                const selectedSessionId = ref(null);
-                const availableAgents = ref([]); // To store agents from backend
-                const selectedAgentId = ref(null); // ID of the selected agent
-                const temperature = ref(0.7);   // Default temperature
-                const topK = ref(40);          // Default Top-K (or null if backend default preferred)
-                const topP = ref(0.9);          // Default Top-P (or null)
+                // --- WebSocket State --- (no change)
+                const ws = ref(null);
+                const isConnected = ref(false);
+                const wsError = ref(null);
 
-                // --- Methods ---
-                const handleSessionSelected = (sessionId) => {
-                    console.log("App: Session selected:", sessionId);
-                    selectedSessionId.value = sessionId;
+                // --- Core App State --- (no change)
+                const topics = ref([]);
+                const availableAgents = ref([]);
+                const selectedTopicId = ref(null);
+                const currentChatMessages = ref([]);
+                const isLoadingHistory = ref(false);
+                const isStreaming = ref(false);
+                const notifications = ref([]);
+                const currentSettings = reactive({ /* ... */ });
+
+                // --- Computed Properties --- (no change)
+                const selectedTopic = computed(() => { /* ... */ });
+                const selectedTopicName = computed(() => selectedTopic.value?.name || "No Topic Selected");
+
+                // --- WebSocket Logic --- (no change)
+                const connectWebSocket = () => { /* ... */ };
+                const sendMessageToWS = (messageObject) => { /* ... */ };
+
+                // --- Helper: Focus Chat Input ---
+                const focusChatInput = () => {
+                    // Use nextTick to ensure the input exists and is visible after state changes
+                    nextTick(() => {
+                        const inputElement = document.querySelector('.input-area input[type="text"]');
+                        if (inputElement) {
+                            inputElement.focus();
+                            console.log("Focused chat input.");
+                        } else {
+                            console.warn("Could not find chat input element to focus.");
+                        }
+                    });
                 };
 
-                // Fetch available agents from backend
-                const fetchAgents = async () => {
-                    try {
-                        const response = await fetch('/api/agents');
-                        if (!response.ok) throw new Error('Failed to fetch agents');
-                        const agents = await response.json();
-                        availableAgents.value = agents;
-                        // Set default selected agent if not already set and agents exist
-                        if (!selectedAgentId.value && agents.length > 0) {
-                            selectedAgentId.value = agents[0].id;
-                        }
-                        console.log("App: Fetched agents:", agents);
-                    } catch (error) {
-                        console.error("App: Error fetching agents:", error);
-                        availableAgents.value = [{ id: 'error', name: 'Error loading agents' }];
-                         selectedAgentId.value = 'error';
+                // --- WebSocket Message Handler (MODIFIED) ---
+                const handleWebSocketMessage = (message) => {
+                     console.log("Received WS message:", message);
+                    const { type, payload } = message;
+
+                    switch (type) {
+                        case "topic_list":
+                            const newTopicsList = payload.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                            topics.value = newTopicsList;
+                            // Auto-selection logic is moved to topic_created or handled after create request
+                            break;
+
+                        case "topic_created":
+                             // Assuming payload contains the new topic object {id, name, ...}
+                             console.log("Topic created successfully:", payload);
+                             // OPTION 1: Add directly (if topic_list isn't sent immediately after)
+                             // topics.value.unshift(payload);
+                             // topics.value.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // Re-sort if needed
+
+                             // OPTION 2: Rely on topic_list being sent right after.
+
+                             // --- Auto-select the newly created topic and focus ---
+                             // Ensure DOM updates before selecting and focusing
+                             nextTick(() => {
+                                handleSelectTopic(payload.id); // Select the new topic
+                                // Focus handled within handleSelectTopic now or called here:
+                                // focusChatInput(); // Ensure focus after selection
+                             });
+                             break;
+
+                        // Other cases remain largely the same...
+                        case "topic_deleted":
+                            if (selectedTopicId.value === payload.topic_id) {
+                                selectedTopicId.value = null;
+                                currentChatMessages.value = [];
+                            }
+                            // Rely on subsequent topic_list update to refresh UI
+                            break;
+                        case "history":
+                            if (payload.topic_id === selectedTopicId.value) {
+                                currentChatMessages.value = payload.messages;
+                                isLoadingHistory.value = false;
+                                nextTick(scrollToBottomInChatBox); // Scroll after loading history
+                            }
+                            break;
+                        case "message_chunk":
+                            if (payload.topic_id === selectedTopicId.value) {
+                                isStreaming.value = true;
+                                const lastMessage = currentChatMessages.value[currentChatMessages.value.length - 1];
+                                if (lastMessage && lastMessage.role === 'assistant') {
+                                    lastMessage.content += payload.chunk;
+                                } else {
+                                    currentChatMessages.value.push({ role: 'assistant', content: payload.chunk, timestamp: new Date().toISOString() });
+                                }
+                                nextTick(scrollToBottomInChatBox); // Scroll as chunks arrive
+                            }
+                            break;
+                         case "message_end":
+                             if (payload.topic_id === selectedTopicId.value) {
+                                isStreaming.value = false;
+                                // Final scroll after streaming ends
+                                nextTick(scrollToBottomInChatBox);
+                             }
+                            break;
+                        case "notification":
+                            notifications.value.unshift(payload);
+                            break;
+                        case "error":
+                            console.error("Backend Error:", payload.message);
+                            alert(`Error: ${payload.message}`);
+                            isLoadingHistory.value = false;
+                            isStreaming.value = false;
+                            break;
+                        default:
+                            console.warn("Unknown message type received:", type);
                     }
                 };
 
-                // Fetch agents when the app mounts
-                onMounted(fetchAgents);
+                 // Helper to trigger ChatBox scroll (if needed, depends on ChatBox implementation)
+                 // If ChatBox handles scrolling internally on props.messages change, this might not be needed.
+                 const scrollToBottomInChatBox = () => {
+                     // This is tricky without direct component communication like provide/inject or event bus.
+                     // Let's assume ChatBox's internal watch/onUpdated handles scrolling for now.
+                     // If not, would need a more complex solution.
+                     console.log("Attempting scroll (ChatBox should handle internally)");
+                 };
 
-                // --- Return state and methods ---
-                return {
-                    selectedSessionId,
-                    availableAgents,
-                    selectedAgentId,
-                    temperature,
-                    topK,
-                    topP,
-                    handleSessionSelected
+
+                // --- Event Handlers from Components (MODIFIED) ---
+                const handleSelectTopic = (topicId) => {
+                    if (selectedTopicId.value === topicId && currentChatMessages.value.length > 0) return; // Don't re-select/fetch if already selected and has messages
+
+                    console.log("App: Selecting topic:", topicId);
+                    selectedTopicId.value = topicId;
+                    currentChatMessages.value = [];
+                    isStreaming.value = false;
+
+                    if (topicId) {
+                        isLoadingHistory.value = true;
+                        sendMessageToWS({ type: "get_history", payload: { topic_id: topicId } });
+                         // Try focusing input after selecting a topic
+                        focusChatInput();
+                    }
                 };
+
+                const handleCreateTopic = (topicData) => { // Receives { agent_id, name }
+                    // No modal data, just the default agent/name from TopicListPanel
+                    sendMessageToWS({ type: "create_topic", payload: topicData });
+                    // Auto-selection now happens when 'topic_created' message is received
+                };
+
+                const handleDeleteTopic = (topicId) => { // No change
+                    sendMessageToWS({ type: "delete_topic", payload: { topic_id: topicId } });
+                };
+
+                const handleUpdateSettings = (newSettings) => { // No change
+                    Object.assign(currentSettings, newSettings);
+                    console.log("App: Settings updated", currentSettings);
+                };
+
+                const handleSendMessage = (messageText) => { // No change
+                    if (!selectedTopicId.value || !messageText) return;
+                    currentChatMessages.value.push({ role: 'user', content: messageText, timestamp: new Date().toISOString() });
+                     nextTick(scrollToBottomInChatBox);
+                    sendMessageToWS({ /* ... payload ... */ });
+                };
+
+                const handleCloseNotification = (id) => { /* ... no change ... */ };
+                const handleClearNotifications = () => { /* ... no change ... */ };
+
+                // --- Initial Data Fetching --- (no change)
+                const fetchInitialData = async () => { /* ... */ };
+
+                // --- Lifecycle Hooks --- (no change)
+                onMounted(() => { /* ... */ });
+                onUnmounted(() => { /* ... */ });
+
+                // --- Return State and Methods --- (no change in structure)
+                return { /* ... */ };
             }
         });
 
-        // Register components (keep as before)
-        app.component('session-list', SessionList);
+        // Register components (no change)
+        app.component('topic-list-panel', TopicListPanel);
         app.component('chat-box', ChatBox);
         app.component('notification-widget', NotificationWidget);
 

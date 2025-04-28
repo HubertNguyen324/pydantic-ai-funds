@@ -1,106 +1,77 @@
 // static/js/components/NotificationWidget.vue.js
-const { ref, onMounted, onUnmounted } = Vue;
+
+// Assuming Vue is loaded globally via a script tag in your HTML
+const { ref, computed } = Vue;
 
 const NotificationWidget = {
-  setup() {
-    const notifications = ref([]); // { id: string, message: string }
-    const isVisible = ref(true); // Controls widget visibility
-    const ws = ref(null); // WebSocket instance
+  // Define the properties this component expects from its parent
+  props: {
+    notifications: { type: Array, default: () => [] }, // Array of notification objects { id, message, type }
+  },
+  // Define the custom events this component can emit
+  emits: ["close-notification", "clear-notifications"],
 
-    const connectWebSocket = () => {
-      // Adjust protocol based on http/https
-      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${wsProtocol}//${window.location.host}/ws/notifications`;
+  // The setup function is where you define reactive state, computed properties, and methods
+  setup(props, { emit }) {
+    // Reactive reference to control the visibility of the notification list
+    const isVisible = ref(true);
 
-      console.log("Attempting to connect WebSocket:", wsUrl);
-      ws.value = new WebSocket(wsUrl);
+    // Computed property to get the number of notifications
+    const notificationCount = computed(() => props.notifications.length);
 
-      ws.value.onopen = () => {
-        console.log("WebSocket connected for notifications.");
-        // Maybe request initial notifications if backend supports it
-      };
-
-      ws.value.onmessage = (event) => {
-        try {
-          const notificationData = JSON.parse(event.data);
-          // Add unique ID if not provided by backend (or use backend's ID)
-          const newNotification = {
-            id: notificationData.id || `notif-${Date.now()}`, // Use backend ID if available
-            message: notificationData.message,
-          };
-          console.log("Received notification:", newNotification);
-          notifications.value.unshift(newNotification); // Add to top
-        } catch (error) {
-          console.error("Failed to parse notification:", event.data, error);
-        }
-      };
-
-      ws.value.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        // Optional: Implement reconnection logic here
-      };
-
-      ws.value.onclose = (event) => {
-        console.log("WebSocket disconnected:", event.reason);
-        ws.value = null;
-        // Optional: Attempt to reconnect after a delay
-        // setTimeout(connectWebSocket, 5000); // Reconnect after 5s
-      };
-    };
-
-    const closeNotification = (id) => {
-      notifications.value = notifications.value.filter((n) => n.id !== id);
-    };
-
-    const clearAllNotifications = () => {
-      notifications.value = [];
-    };
-
+    // Function to toggle the visibility of the notification list
     const toggleVisibility = () => {
       isVisible.value = !isVisible.value;
     };
 
-    // Lifecycle hooks
-    onMounted(() => {
-      connectWebSocket();
-    });
+    // Function to emit the 'close-notification' event to the parent
+    const closeNotification = (id) => {
+      emit("close-notification", id);
+    };
 
-    onUnmounted(() => {
-      if (ws.value) {
-        ws.value.close();
-        console.log("WebSocket connection closed on component unmount.");
-      }
-    });
+    // Function to emit the 'clear-notifications' event to the parent
+    const clearAllNotifications = () => {
+      emit("clear-notifications");
+    };
 
+    // Return the reactive state, computed properties, and methods to be used in the template
     return {
-      notifications,
-      isVisible,
-      toggleVisibility,
-      closeNotification,
-      clearAllNotifications,
+      isVisible, // Visibility state
+      toggleVisibility, // Method to toggle visibility
+      closeNotification, // Method to close a single notification
+      clearAllNotifications, // Method to clear all notifications
+      notificationCount, // Computed property for the count
+      // The notifications prop is used directly in the template
     };
   },
+
+  // --- Template ---
+  // The HTML structure for the NotificationWidget component
   template: `
-        <div class="notification-widget-container">
-            <button @click="toggleVisibility" class="toggle-button sticky-toggle">
-                {{ isVisible ? 'Hide' : 'Show' }} Notifications ({{ notifications.length }})
-            </button>
-            <div v-show="isVisible" class="notification-list">
-                 <div v-if="notifications.length > 0" class="notification-controls">
-                     <button @click="clearAllNotifications" class="clear-all-btn">Clear All</button>
-                 </div>
-                <div v-if="notifications.length === 0" class="no-notifications">
-                    No new notifications.
-                </div>
-                <ul>
-                    <li v-for="n in notifications" :key="n.id" class="notification-item">
-                        <span>{{ n.message }}</span>
-                        <button @click="closeNotification(n.id)" class="close-btn">X</button>
-                    </li>
-                </ul>
-            </div>
+    <div class="notification-widget-container">
+      <button @click="toggleVisibility" class="toggle-button sticky-toggle">
+        {{ isVisible ? 'Hide' : 'Show' }} Notifications ({{ notificationCount }})
+      </button>
+
+      <div v-show="isVisible" class="notification-list">
+        <div v-if="notifications.length > 0" class="notification-controls">
+          <button @click="clearAllNotifications" class="clear-all-btn">Clear All</button>
         </div>
-    `,
+
+        <div v-if="notifications.length === 0" class="no-notifications">
+            No new notifications.
+        </div>
+
+        <ul>
+          <li v-for="n in notifications" :key="n.id" :class="['notification-item', n.type]">
+            <span>{{ n.message }}</span>
+            <button @click="closeNotification(n.id)" class="close-btn">X</button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  `,
 };
 
+// Export the component definition
 export default NotificationWidget;

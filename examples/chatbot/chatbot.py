@@ -66,30 +66,20 @@ def send_notification(notification_data: Notification):
 class AIChatAgent:
     def __init__(self, model: Model, sys_prompt: str):
         self.agent = Agent(model=model, system_prompt=sys_prompt)
+        self.chat_history: list[ModelMessage] = []
 
-    def chat(self, user_message: str, chat_history: list[ModelMessage]) -> ChatMessage:
+    def chat(self, user_message: str) -> ChatMessage:
         """
         Generates a response based on the user message and chat history,
         potentially including a notification via simulated function calling.
         """
-        print(f"Agent received message: {user_message}")
-        print(f"Agent sees history: {chat_history}")
-
         # Default response structure
-        agent_response = AgentResponse(response_text="Sorry, I didn't understand that.")
+        agent_response = self.agent.run_sync(
+            user_prompt=user_message,
+            message_history=self.chat_history
+        )
 
-        # --- Simulated PydanticAI Function Calling Logic ---
-        # In a real PydanticAI implementation:
-        # 1. You would provide the definition of the `send_notification` function
-        #    (or its schema derived from the Notification model) to the LLM via PydanticAI.
-        # 2. The LLM would decide *if* it needs to call the function based on the user message.
-        # 3. If it decides to call, it generates a structured output (e.g., JSON)
-        #    conforming to the Notification model (the function arguments).
-        # 4. PydanticAI would parse this output.
-        # 5. Your code would detect the function call, validate arguments, and execute `send_notification`.
-        # 6. You might then make another LLM call to get a user-facing text response *after* the action,
-        #    or just return a confirmation.
-
+        
         # --- Simulation: Check for a trigger phrase ---
         if "send a notification" in user_message.lower():
             print("Detected trigger phrase for notification.")
